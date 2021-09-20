@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Usage
+function usage()
+{
+cat << EOF
+Usage: $(basename "$0") -c -q
+where:
+    -h|-help        Prints this help message
+    -c|-connect     Activates Appgate SDP app
+    -q|-quit        Quits Appgate SDP app cleanly
+EOF
+}
+
+while [ "$1" != "" ]; do
+    case "$1" in
+        -h|-help) usage
+            exit
+            ;;
+        -c|-connect)
+            osascript -e 'tell application "AppGate SDP"' -e 'activate' -e 'end tell'
+            exit
+            ;;
+        -q|-quit) osascript -e 'quit app "Appgate SDP"'
+            exit
+            ;;
+        * ) usage
+            exit 1
+    esac
+done

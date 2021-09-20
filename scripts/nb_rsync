@@ -1,0 +1,137 @@
+#!/usr/local/bin/python3
+'''
+Rsync Nightly build of a given release and platform from a remote machine to 
+the specificed location on the local machine.
+'''
+
+import argparse
+import os
+import subprocess
+
+""
+
+PLATFORMS = {
+    'Linux': 'Linux-x86_64',
+    'Windows': 'Windows-x64',
+    'Darwin': 'MacOSX'
+}
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('-r',
+                        required=True,
+                        dest='release',
+                        help='Release name. Ex: 2021-4')
+    choices = ('OB', 'NB')
+    msg = f"Type of Build that should be rsynced. Options are: {choices}. (Default: NB)"
+    parser.add_argument('-t',
+                        default='NB',
+                        choices=choices,
+                        dest='build_type',
+                        help=msg)
+    msg = "Absolute path of local directory into which build should be copied"
+    parser.add_argument('-d',
+                        required=True,
+                        dest='local_destination',
+                        help=msg)
+    msg = 'Remote host name from which the build should be rsynced. Default: nyc-bld-lv02.schrodinger.com'
+    parser.add_argument('-H',
+                        default='nyc-bld-lv02.schrodinger.com',
+                        dest='remote_host',
+                        help=msg)
+    parser.add_argument('-x',
+                        default=['licenses', '__pycache__'],
+                        dest='to_exclude',
+                        action='append',
+                        help="Files or Folders to exlcude during rsync. Default: ['licenses', '__pycache__']")
+    choices = PLATFORMS.keys()
+    msg = f"Build of platform of choice. Options are: {choices}. When not \
+        provided it will be automatically picked based on local platform."
+
+    parser.add_argument('-p', choices=choices, dest='platform', help=msg)
+    parser.add_argument('-u',
+                        default=os.getenv('USER'),
+                        dest='username',
+                        help=f"Username to be used for SSH. Default: {os.getenv('USER')}")
+    parser.add_argument('-v',
+                        action='store_true',
+                        dest='verbose',
+                        help='Verbose output.')
+
+    return parser.parse_args()
+
+
+def run_small_proc(cmd):
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
+    except subprocess.CalledProcessError:
+        raise
+    output = proc.stdout.decode("utf-8").strip()
+
+    return output
+
+
+def run_long_proc(cmd, verbose=False):
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    while True:
+        output = process.stdout.readline()
+        if output == '' or process.poll() is not None:
+            break
+        if output and verbose:
+            print(output.decode('utf-8').strip())
+
+    rc = process.poll()
+    return rc
+
+
+def main():
+    args = parse_arguments()
+
+    # Pick platform if not provided
+    if not args.platform:
+        platform_info = os.uname()
+        args.platform = platform_info.sysname
+
+    # Print info to the user
+    if args.verbose:
+        print(f"Release: {args.release}")
+        print(f"Build type: {args.build_type}")
+        print(f"Remote host: {args.remote_host}")
+        print(f"Local destination: {args.local_destination}")
+        print(f"Platform: {args.platform}")
+        print(f"Item(s) excluding during rsync: {args.to_exclude}")
+        print(f"Username being used for rsync: {args.username}")
+
+    # Fetch the latest available build on remote host
+    cmd = f"ssh {args.username}@{args.remote_host} /utils/bin/latest_build.sh -b {args.build_type} -p {PLATFORMS[args.platform]} -r {args.release}"
+    latest_build = run_small_proc(cmd.split())
+    if args.verbose:
+        print(f"Latest available build: {latest_build}")
+
+    # Check if dir exists on remote location
+    cmd = [
+        'ssh', f"{args.username}@{args.remote_host}", f"test -e {latest_build}"
+    ]
+    run_small_proc(cmd)
+
+    # Rsync commands
+    rsync_prefix = ['rsync', '-av']
+    exclude_args = [f'--exclude={k}' for k in args.to_exclude]
+    rsync_suffix = [
+        '--delete-after', '--delete-excluded',
+        f"{args.username}@{args.remote_host}:{latest_build}/",
+        args.local_destination + '/'
+    ]
+
+    if args.verbose:
+        rsync_prefix += ['--progress']
+        print('Starting rsync...')
+    cmd = rsync_prefix + exclude_args + rsync_suffix
+    os.makedirs(args.local_destination, exist_ok=True)
+
+    rsync_proc = run_long_proc(cmd, args.verbose)
+
+
+if __name__ == '__main__':
+    main()

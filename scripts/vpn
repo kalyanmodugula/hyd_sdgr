@@ -1,0 +1,84 @@
+#!/bin/sh
+
+# Wrapper script over OSX `networksetup` tool to connect/disconnect VPN
+# Works only on MacOSX
+
+# Usage
+function usage()
+{
+cat << EOF
+This is a wrapper script over OSX \`networksetup\` tool to make vpn
+connection/disconnection from the terminal easily.
+Note: If the VPN service name has spaces, pass the name in double quotes.
+
+Usage: $(basename "$0") [-h] [-l] [-s PDX-VPN] [-c PDX-VPN] [-d 'PDX ALL']
+
+where:
+    -h | --help         Prints this help message
+    -l | --list         List all available network connections
+    -s | --status       Prints the current status of a VPN service
+    -c | --connect      Connect to a VPN service
+    -d | --disconnect   Disconnect from a VPN service
+EOF
+}
+
+# Arguments parser
+while [ "$1" != "" ];do
+    case $1 in
+        -h | --help )
+            usage
+            ;;
+        -l | --list )
+            networksetup -listallnetworkservices
+            exit
+            ;;
+        -s | --status )
+            shift
+            service_name="$1"
+            ;;
+        -c | --connect )
+            shift
+            service_up="$1"
+            ;;
+        -d | --disconnect )
+            shift
+            service_down="$1"
+            ;;
+        * ) echo "Invalid argument(s): $*\n"
+            usage
+            exit 1
+    esac
+    shift
+done
+
+# function to validate service name
+function is_service()
+{
+    if ! networksetup -listallnetworkservices | grep -qw "$1";then
+        echo "Unrecognized VPN service: $1"
+        exit 1
+    fi
+}
+
+# Check and print service status
+if [ ! -z "${service_name}" ]; then
+    is_service "${service_name}"
+    if scutil --nc status "${service_name}" | sed -n 1p | grep -qv Connected; then
+        echo "VPN \`${service_name}\` status: Not-connected/Disconnected"
+    else
+        echo "VPN \`${service_name}\` status: Connected"
+    fi
+fi
+
+# Disconnect a vpn service
+if [ ! -z "${service_down}" ];then
+    is_service "${service_down}"
+    networksetup -disconnectpppoeservice "${service_down}"
+    sleep 2
+fi    
+
+# Validate and Connect to VPN
+if [ ! -z "${service_up}" ]; then
+    is_service "${service_up}"
+    networksetup -connectpppoeservice "${service_up}"
+fi
