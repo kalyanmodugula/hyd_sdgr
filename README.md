@@ -1,10 +1,10 @@
 # Scripts, tools, themes, settings etc., that makes your worklife easier.
 
 **Scripts**:
-1. nb_rsync
-2. download_schrodinger_hosts.py
-3. vpn
-4. appgate
+1. [nb_rsync](https://github.com/vulcun99/hydsdgr/blob/master/README.md#nb_rsync--rsync-the-latest-build-of-platform-of-choice-to-local-machine)
+2. [download_schrodinger_hosts.py](https://github.com/vulcun99/hydsdgr/blob/master/README.md#download_schrodinger_hostspy-download-schrodingerhosts-file-for-the-releasebuildbuildtype-of-choice)
+3. [vpn](https://github.com/vulcun99/hydsdgr/blob/master/README.md#vpn--disconnect-from-andor-connect-to-a-vpn-service-on-mac-from-terminal)
+4. [appgate](https://github.com/vulcun99/hydsdgr/blob/master/README.md#appgate--activate-or-quit-appgate-on-mac)
 
 ### *nb_rsync*:  Rsync the latest build of platform of choice to local machine
 Pre-requisites:
@@ -17,8 +17,6 @@ Usage: Use "-h" to know more details
 ```bash
 nb_rsync -r 2021-3 -d /home/myhome -v -H my-remote-host.domain.com
 ```
-
-
 ### *download_schrodinger_hosts.py*: Download schrodinger.hosts file for the release/build/buildtype of choice
 Pre-requisites:
 1. Needs python3 version
