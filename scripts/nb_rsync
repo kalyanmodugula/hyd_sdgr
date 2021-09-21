@@ -8,6 +8,8 @@ import argparse
 import os
 import subprocess
 
+import download_schrodinger_hosts
+
 ""
 
 PLATFORMS = {
@@ -28,14 +30,14 @@ def parse_arguments():
     parser.add_argument('-t',
                         default='NB',
                         choices=choices,
-                        dest='build_type',
+                        dest='buildtype',
                         help=msg)
     msg = "Absolute path of local directory into which build should be copied"
     parser.add_argument('-d',
                         required=True,
                         dest='local_destination',
                         help=msg)
-    msg = 'Remote host name from which the build should be rsynced. Default: nyc-bld-lv02.schrodinger.com'
+    msg = 'Remote host name from which the build should be rsynced.'
     parser.add_argument('-H',
                         default='nyc-bld-lv02.schrodinger.com',
                         dest='remote_host',
@@ -44,7 +46,7 @@ def parse_arguments():
                         default=['licenses', '__pycache__'],
                         dest='to_exclude',
                         action='append',
-                        help="Files or Folders to exlcude during rsync. Default: ['licenses', '__pycache__']")
+                        help='Files or Folders to exlcude during rsync.')
     choices = PLATFORMS.keys()
     msg = f"Build of platform of choice. Options are: {choices}. When not \
         provided it will be automatically picked based on local platform."
@@ -53,7 +55,7 @@ def parse_arguments():
     parser.add_argument('-u',
                         default=os.getenv('USER'),
                         dest='username',
-                        help=f"Username to be used for SSH. Default: {os.getenv('USER')}")
+                        help='Username to be used for SSH')
     parser.add_argument('-v',
                         action='store_true',
                         dest='verbose',
@@ -96,7 +98,7 @@ def main():
     # Print info to the user
     if args.verbose:
         print(f"Release: {args.release}")
-        print(f"Build type: {args.build_type}")
+        print(f"Build type: {args.buildtype}")
         print(f"Remote host: {args.remote_host}")
         print(f"Local destination: {args.local_destination}")
         print(f"Platform: {args.platform}")
@@ -104,8 +106,9 @@ def main():
         print(f"Username being used for rsync: {args.username}")
 
     # Fetch the latest available build on remote host
-    cmd = f"ssh {args.username}@{args.remote_host} /utils/bin/latest_build.sh -b {args.build_type} -p {PLATFORMS[args.platform]} -r {args.release}"
+    cmd = f"ssh {args.username}@{args.remote_host} /utils/bin/latest_build.sh -b {args.buildtype} -p {PLATFORMS[args.platform]} -r {args.release}"
     latest_build = run_small_proc(cmd.split())
+    latest_build_id = latest_build.split('/')[-2]
     if args.verbose:
         print(f"Latest available build: {latest_build}")
 
@@ -128,9 +131,19 @@ def main():
         rsync_prefix += ['--progress']
         print('Starting rsync...')
     cmd = rsync_prefix + exclude_args + rsync_suffix
+
+    # Create destination path if not exist
     os.makedirs(args.local_destination, exist_ok=True)
 
+    # Run rsync process
     rsync_proc = run_long_proc(cmd, args.verbose)
+
+    # Download schrodinger.hosts
+    hostfile_text = download_schrodinger_hosts.get_hosts_file_text(
+        args.release, args.buildtype, latest_build_id, user=args.username)
+    with open(os.path.join(args.local_destination, 'schrodinger.hosts'),
+              'w') as fh:
+        fh.write(hostfile_text)
 
 
 if __name__ == '__main__':
